@@ -1,11 +1,15 @@
 port module Main exposing (..)
 
-import Html exposing (Html, div, button, text, h1, section)
+import Html exposing (Html, div, button, text, h1, section, node)
+import Html.Attributes exposing (class, type')
 import Html.Events exposing (onClick)
 import Html.App as App
 import Window
 import Task exposing (andThen)
 import Mouse
+import Element exposing (Element)
+import Collage exposing (collage, path, traced, solid, move)
+import Color exposing (..)
 
 
 type alias Model =
@@ -63,7 +67,8 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     div []
-        [ section []
+        [ styles
+        , section []
             [ h1 [] [ text "Gain" ]
             , button [ onClick DecrementGain ] [ text "-" ]
             , div [] [ text (toString model.gainValue) ]
@@ -80,11 +85,63 @@ view model =
             , div [] [ text (toString model.windowHeight) ]
             , div [] [ text (toString model.windowWidth) ]
             ]
-        , section []
-            [ h1 [] [ text "Visualization Data" ]
-            , div [] [ text (toString model.visualizationData) ]
-            ]
+        , div [ class "visualization" ]
+            [ (visualizationGraph model) |> Element.toHtml ]
         ]
+
+
+styles : Html Msg
+styles =
+    node "style"
+        [ type' "text/css" ]
+        [ text ".visualization { position: absolute; top: 0; left: 0; }" ]
+
+
+visualizationGraph : Model -> Element
+visualizationGraph model =
+    let
+        -- We turn the model into a set of points for a path
+        points =
+            (toPoints model)
+    in
+        -- We want the collage to have the same width and height as the window
+        collage model.windowWidth
+            model.windowHeight
+            -- And it consists of a path across our points, traced solid red, and
+            -- moved to the far left and vertical middle of the collage
+            [ path points |> traced (solid red) |> move ( (toFloat model.windowWidth) / -2, (toFloat model.windowHeight) / -2 )
+            ]
+
+
+toPoints : Model -> List ( Float, Float )
+toPoints model =
+    let
+        -- The width of each slice is the window width divided by the number of
+        -- data points we have.
+        sliceWidth =
+            (toFloat model.windowWidth) / (toFloat (List.length model.visualizationData))
+
+        -- Turning a given piece of data into a point requires knowing its index in
+        -- the list.
+        indexedDatumToPoint n datum =
+            let
+                -- Its y coordinate should be its percentage (out of 128 total) times
+                -- the window height, divided by 2.
+                v =
+                    (toFloat datum) / 128
+
+                y =
+                    (v * (toFloat model.windowHeight)) / 2
+
+                -- And its x coordinate is its percentage of the total data set times
+                -- the slice width.
+                x =
+                    sliceWidth * (toFloat n)
+            in
+                ( x, y )
+    in
+        model.visualizationData
+            |> List.indexedMap indexedDatumToPoint
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
