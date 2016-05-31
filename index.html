@@ -7,7 +7,32 @@
   </head>
   <body>
     <script type="text/javascript">
+      // create web audio api context
+      var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // create Oscillator and gain node
+      var oscillator = audioCtx.createOscillator();
+      var gainNode = audioCtx.createGain();
+      // connect oscillator to gain node to speakers
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      // We'll set the initial oscillator frequency to 3000 Hertz.
+      var initialFreq = 3000;
+      // We'll set the initial volume to 0.001
+      var initialVol = 0.001;
+      // and we'll set some options for the oscillator
+      oscillator.type = 'square';
+      oscillator.frequency.value = initialFreq;
+      oscillator.detune.value = 100;
+      oscillator.start(0);
+      // set options for the gain node
+      gainNode.gain.value = initialVol;
+
       var app = Elm.Main.fullscreen();
+
+      app.ports.audio.subscribe(function(model){
+        gainNode.gain.value = model.gainValue;
+        oscillator.frequency.value = model.frequencyValue;
+      });
     </script>
   </body>
 </html>
