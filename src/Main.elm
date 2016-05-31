@@ -8,7 +8,7 @@ import Window
 import Task exposing (andThen)
 import Mouse
 import Element exposing (Element)
-import Collage exposing (collage, path, traced, solid, move)
+import Collage exposing (collage, path, traced, solid, move, alpha, Form)
 import Color exposing (..)
 
 
@@ -17,7 +17,7 @@ type alias Model =
     , frequencyValue : Float
     , windowWidth : Int
     , windowHeight : Int
-    , visualizationData : List Int
+    , visualizationData : List (List Int)
     }
 
 
@@ -39,6 +39,11 @@ model =
     , windowHeight = 100
     , visualizationData = []
     }
+
+
+pastVisualizationCount : Int
+pastVisualizationCount =
+    10
 
 
 getInitialWindowSize : Cmd Msg
@@ -99,39 +104,50 @@ styles =
 
 visualizationGraph : Model -> Element
 visualizationGraph model =
+    collage model.windowWidth
+        model.windowHeight
+        (List.indexedMap (visualizationGraphForDatum model.windowWidth model.windowHeight) model.visualizationData)
+
+
+visualizationGraphForDatum : Int -> Int -> Int -> List Int -> Form
+visualizationGraphForDatum windowWidth windowHeight count datum =
     let
-        -- We turn the model into a set of points for a path
         points =
-            (toPoints model)
+            toPoints windowWidth windowHeight count datum
+
+        alphaLevel =
+            case count of
+                0 ->
+                    1
+
+                _ ->
+                    0.1
     in
-        -- We want the collage to have the same width and height as the window
-        collage model.windowWidth
-            model.windowHeight
-            -- And it consists of a path across our points, traced solid red, and
-            -- moved to the far left and vertical middle of the collage
-            [ path points |> traced (solid red) |> move ( (toFloat model.windowWidth) / -2, (toFloat model.windowHeight) / -2 )
-            ]
+        path points
+            |> traced (solid red)
+            |> alpha alphaLevel
+            |> move ( (toFloat windowWidth) / -2, (toFloat windowHeight) / -2 )
 
 
-toPoints : Model -> List ( Float, Float )
-toPoints model =
+toPoints : Int -> Int -> Int -> List Int -> List ( Float, Float )
+toPoints windowWidth windowHeight count datum =
     let
         -- The width of each slice is the window width divided by the number of
         -- data points we have.
         sliceWidth =
-            (toFloat model.windowWidth) / (toFloat (List.length model.visualizationData))
+            (toFloat windowWidth) / (toFloat (List.length datum))
 
         -- Turning a given piece of data into a point requires knowing its index in
         -- the list.
-        indexedDatumToPoint n datum =
+        indexedDatumToPoint n internalDatum =
             let
                 -- Its y coordinate should be its percentage (out of 128 total) times
                 -- the window height, divided by 2.
                 v =
-                    (toFloat datum) / 128
+                    (toFloat internalDatum) / 128
 
                 y =
-                    (v * (toFloat model.windowHeight)) / 2
+                    (v * (toFloat windowHeight)) / 2
 
                 -- And its x coordinate is its percentage of the total data set times
                 -- the slice width.
@@ -140,7 +156,7 @@ toPoints model =
             in
                 ( x, y )
     in
-        model.visualizationData
+        datum
             |> List.indexedMap indexedDatumToPoint
 
 
@@ -198,10 +214,20 @@ update msg model =
                 ( newModel, audio newModel )
 
         Visualization data ->
-            ( { model | visualizationData = data }, Cmd.none )
+            ( (updateVisualizationData data model), Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
+
+
+updateVisualizationData : List Int -> Model -> Model
+updateVisualizationData data model =
+    let
+        newVisualizationData =
+            data
+                :: model.visualizationData
+    in
+        { model | visualizationData = List.take pastVisualizationCount newVisualizationData }
 
 
 port audio : Model -> Cmd msg
