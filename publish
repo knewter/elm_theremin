@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e
+
+git checkout -b gh-pages
+./build
+git add -f target/
+git commit -m"Update with latest code."
+git push -f origin gh-pages
+git checkout master
+git branch -D gh-pages
