@@ -13,6 +13,7 @@ type alias Model =
     , frequencyValue : Float
     , windowWidth : Int
     , windowHeight : Int
+    , visualizationData : List Int
     }
 
 
@@ -23,6 +24,7 @@ type Msg
     | DecrementFrequency
     | UpdateDimensions { width : Int, height : Int }
     | UpdateMouse ( Int, Int )
+    | Visualization (List Int)
     | NoOp
 
 
@@ -31,6 +33,7 @@ model =
     , frequencyValue = 3000
     , windowWidth = 100
     , windowHeight = 100
+    , visualizationData = []
     }
 
 
@@ -53,6 +56,7 @@ subscriptions model =
     Sub.batch
         [ Window.resizes UpdateDimensions
         , Mouse.moves (\{ x, y } -> UpdateMouse ( x, y ))
+        , visualization Visualization
         ]
 
 
@@ -75,6 +79,10 @@ view model =
             [ h1 [] [ text "Dimensions" ]
             , div [] [ text (toString model.windowHeight) ]
             , div [] [ text (toString model.windowWidth) ]
+            ]
+        , section []
+            [ h1 [] [ text "Visualization Data" ]
+            , div [] [ text (toString model.visualizationData) ]
             ]
         ]
 
@@ -132,8 +140,14 @@ update msg model =
             in
                 ( newModel, audio newModel )
 
+        Visualization data ->
+            ( { model | visualizationData = data }, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
 
 port audio : Model -> Cmd msg
+
+
+port visualization : (List Int -> msg) -> Sub msg

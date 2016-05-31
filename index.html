@@ -12,8 +12,18 @@
       // create Oscillator and gain node
       var oscillator = audioCtx.createOscillator();
       var gainNode = audioCtx.createGain();
-      // connect oscillator to gain node to speakers
+      // create an analyser node for our audio
+      var analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      // We'll track our bufferLength, which will be the same as our fftSize
+      var bufferLength = analyser.fftSize;
+      // create a Uint8Array to hold analyzer data, of size bufferLength
+      var dataArray = new Uint8Array(bufferLength);
+      // connect oscillator to gain node
       oscillator.connect(gainNode);
+      // connect gain node to analyser
+      gainNode.connect(analyser);
+      // connect gain node to speakers
       gainNode.connect(audioCtx.destination);
       // We'll set the initial oscillator frequency to 3000 Hertz.
       var initialFreq = 3000;
@@ -27,7 +37,24 @@
       // set options for the gain node
       gainNode.gain.value = initialVol;
 
+      // We're adding an inbound port in our elm app for the visualization data.
       var app = Elm.Main.fullscreen();
+      // We'll make a variable to store our request for an animation frame in,
+      // so that we can cancel it conceivably later...though we won't actually bother
+      // with that.
+      var drawAnimationFrame;
+      // Make a quick function to fetch our data.
+      function draw() {
+        // Request that our function be called next animation frame.
+        drawAnimationFrame = requestAnimationFrame(draw);
+        // fill the data buffer
+        analyser.getByteTimeDomainData(dataArray);
+        // Send it to a 'visualization' port, converting it to an Array of
+        // integers.
+        app.ports.visualization.send(Array.from(dataArray));
+      }
+
+      draw();
 
       app.ports.audio.subscribe(function(model){
         gainNode.gain.value = model.gainValue;
