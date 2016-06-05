@@ -17,7 +17,7 @@ type alias Model =
     , frequencyValue : Float
     , windowWidth : Int
     , windowHeight : Int
-    , visualizationData : List (List Int)
+    , visualizationPaths : List Form
     }
 
 
@@ -37,7 +37,7 @@ model =
     , frequencyValue = 3000
     , windowWidth = 100
     , windowHeight = 100
-    , visualizationData = []
+    , visualizationPaths = []
     }
 
 
@@ -104,33 +104,34 @@ styles =
 
 visualizationGraph : Model -> Element
 visualizationGraph model =
-    collage model.windowWidth
-        model.windowHeight
-        (List.indexedMap (visualizationGraphForDatum model.windowWidth model.windowHeight) model.visualizationData)
-
-
-visualizationGraphForDatum : Int -> Int -> Int -> List Int -> Form
-visualizationGraphForDatum windowWidth windowHeight count datum =
     let
-        points =
-            toPoints windowWidth windowHeight count datum
-
-        alphaLevel =
+        applyAlpha : Int -> Form -> Form
+        applyAlpha count path =
             case count of
-                0 ->
-                    1
+                1 ->
+                    path
 
                 _ ->
-                    0.1
+                    path |> alpha 0.1
+    in
+        collage model.windowWidth
+            model.windowHeight
+            (List.indexedMap applyAlpha model.visualizationPaths)
+
+
+visualizationGraphForDatum : Int -> Int -> List Int -> Form
+visualizationGraphForDatum windowWidth windowHeight datum =
+    let
+        points =
+            toPoints windowWidth windowHeight datum
     in
         path points
             |> traced (solid red)
-            |> alpha alphaLevel
             |> move ( (toFloat windowWidth) / -2, (toFloat windowHeight) / -2 )
 
 
-toPoints : Int -> Int -> Int -> List Int -> List ( Float, Float )
-toPoints windowWidth windowHeight count datum =
+toPoints : Int -> Int -> List Int -> List ( Float, Float )
+toPoints windowWidth windowHeight datum =
     let
         -- The width of each slice is the window width divided by the number of
         -- data points we have.
@@ -168,35 +169,35 @@ update msg model =
                 newModel =
                     { model | gainValue = model.gainValue + 0.001 }
             in
-                ( newModel, audio newModel )
+                ( newModel, sendAudio newModel )
 
         DecrementGain ->
             let
                 newModel =
                     { model | gainValue = model.gainValue - 0.001 }
             in
-                ( newModel, audio newModel )
+                ( newModel, sendAudio newModel )
 
         IncrementFrequency ->
             let
                 newModel =
                     { model | frequencyValue = model.frequencyValue + 100 }
             in
-                ( newModel, audio newModel )
+                ( newModel, sendAudio newModel )
 
         DecrementFrequency ->
             let
                 newModel =
                     { model | frequencyValue = model.frequencyValue - 100 }
             in
-                ( newModel, audio newModel )
+                ( newModel, sendAudio newModel )
 
         UpdateDimensions { width, height } ->
             let
                 newModel =
                     { model | windowWidth = width, windowHeight = height }
             in
-                ( newModel, audio newModel )
+                ( newModel, sendAudio newModel )
 
         UpdateMouse ( x, y ) ->
             let
@@ -211,7 +212,7 @@ update msg model =
                 newModel =
                     { model | frequencyValue = newFrequency, gainValue = newGain }
             in
-                ( newModel, audio newModel )
+                ( newModel, sendAudio newModel )
 
         Visualization data ->
             ( (updateVisualizationData data model), Cmd.none )
@@ -223,14 +224,21 @@ update msg model =
 updateVisualizationData : List Int -> Model -> Model
 updateVisualizationData data model =
     let
-        newVisualizationData =
-            data
-                :: model.visualizationData
+        newVisualizationPath =
+            visualizationGraphForDatum model.windowWidth model.windowHeight data
+
+        newVisualizationPaths =
+            newVisualizationPath :: model.visualizationPaths
     in
-        { model | visualizationData = List.take pastVisualizationCount newVisualizationData }
+        { model | visualizationPaths = List.take 10 newVisualizationPaths }
 
 
-port audio : Model -> Cmd msg
+sendAudio : Model -> Cmd msg
+sendAudio model =
+    audio { frequencyValue = model.frequencyValue, gainValue = model.gainValue }
+
+
+port audio : { frequencyValue : Float, gainValue : Float } -> Cmd msg
 
 
 port visualization : (List Int -> msg) -> Sub msg
